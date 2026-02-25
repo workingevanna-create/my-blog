@@ -6,7 +6,7 @@ import sitemap from '@astrojs/sitemap';
 import vercel from '@astrojs/vercel';
 
 export default defineConfig({
-  site: 'https://yourdomain.com', // 記得換成你的網址
+  site: 'https://my-blog-dun-eight.vercel.app/', // 記得換成你的網址
   output: 'server',
   adapter: vercel(),
 

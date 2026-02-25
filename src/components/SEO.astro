@@ -26,28 +26,39 @@ const {
   siteName = '你的部落格',
 } = Astro.props;
 
+const siteBase = Astro.site ?? new URL(Astro.url.origin);
+const siteHref = siteBase.toString();
+
+const toAbsoluteUrl = (value: string, fallbackPath = '/') => {
+  try {
+    return new URL(value, siteBase).toString();
+  } catch {
+    return new URL(fallbackPath, siteBase).toString();
+  }
+};
+
 // ── OG Image：優先用傳入值，否則走 Vercel OG 動態生成 ──────────────
 // /api/og 是 src/pages/api/og.ts 提供的端點（見下方說明）
 // Fallback 鏈：自訂圖 → Vercel OG 動態卡片 → 靜態預設圖
 const ogImageUrl = ogImage
-  ? new URL(ogImage, Astro.site).toString()
-  : new URL(
+  ? toAbsoluteUrl(ogImage, '/og-default.png')
+  : toAbsoluteUrl(
       `/api/og?title=${encodeURIComponent(title)}&desc=${encodeURIComponent(description)}`,
-      Astro.site
-    ).toString();
+      '/og-default.png'
+    );
 
 // ── 確保 canonicalUrl 永遠是基於 Astro.site 的絕對路徑 ─────────────
 // 防止 localhost 或 www / non-www 混用造成的 canonical 污染
 const resolvedCanonical = (() => {
   try {
-    const u = new URL(canonicalUrl);
+    const u = new URL(canonicalUrl, siteBase);
     // 如果是 localhost，強制替換成正式 site
     if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') {
-      return new URL(u.pathname + u.search, Astro.site).toString();
+      return new URL(u.pathname + u.search, siteBase).toString();
     }
     return u.toString();
   } catch {
-    return new URL(canonicalUrl, Astro.site).toString();
+    return new URL(Astro.url.pathname + Astro.url.search, siteBase).toString();
   }
 })();
 
@@ -61,24 +72,24 @@ const jsonLd = {
   '@graph': [
     {
       '@type': 'WebSite',
-      '@id': `${Astro.site}#website`,
-      url: Astro.site?.toString(),
+      '@id': `${siteHref}#website`,
+      url: siteHref,
       name: siteName,
       inLanguage: 'zh-TW',
       potentialAction: {
         '@type': 'SearchAction',
         target: {
           '@type': 'EntryPoint',
-          urlTemplate: `${Astro.site}search?q={search_term_string}`,
+          urlTemplate: `${siteHref}search?q={search_term_string}`,
         },
         'query-input': 'required name=search_term_string',
       },
     },
     {
       '@type': 'Person',
-      '@id': `${Astro.site}#author`,
+      '@id': `${siteHref}#author`,
       name: authorName,
-      url: Astro.site?.toString(),
+      url: siteHref,
     },
     ...(ogType === 'article' && pubDate
       ? [
@@ -99,9 +110,9 @@ const jsonLd = {
               width: 1200,
               height: 630,
             },
-            author: { '@id': `${Astro.site}#author` },
-            publisher: { '@id': `${Astro.site}#website` },
-            isPartOf: { '@id': `${Astro.site}#website` },
+            author: { '@id': `${siteHref}#author` },
+            publisher: { '@id': `${siteHref}#website` },
+            isPartOf: { '@id': `${siteHref}#website` },
             inLanguage: 'zh-TW',
           },
         ]
