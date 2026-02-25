@@ -1,0 +1,142 @@
+---
+// src/components/SEO.astro
+export interface Props {
+  title: string;
+  description: string;
+  canonicalUrl?: string;
+  ogImage?: string;
+  ogType?: 'website' | 'article';
+  pubDate?: string;       // ISO 8601 string
+  updatedDate?: string;   // ISO 8601 string
+  tags?: string[];
+  authorName?: string;
+  siteName?: string;
+}
+
+const {
+  title,
+  description,
+  canonicalUrl = Astro.url.href,
+  ogImage,
+  ogType = 'website',
+  pubDate,
+  updatedDate,
+  tags = [],
+  authorName = '你的名字',
+  siteName = '你的部落格',
+} = Astro.props;
+
+// ── OG Image：優先用傳入值，否則走 Vercel OG 動態生成 ──────────────
+// /api/og 是 src/pages/api/og.ts 提供的端點（見下方說明）
+// Fallback 鏈：自訂圖 → Vercel OG 動態卡片 → 靜態預設圖
+const ogImageUrl = ogImage
+  ? new URL(ogImage, Astro.site).toString()
+  : new URL(
+      `/api/og?title=${encodeURIComponent(title)}&desc=${encodeURIComponent(description)}`,
+      Astro.site
+    ).toString();
+
+// ── 確保 canonicalUrl 永遠是基於 Astro.site 的絕對路徑 ─────────────
+// 防止 localhost 或 www / non-www 混用造成的 canonical 污染
+const resolvedCanonical = (() => {
+  try {
+    const u = new URL(canonicalUrl);
+    // 如果是 localhost，強制替換成正式 site
+    if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') {
+      return new URL(u.pathname + u.search, Astro.site).toString();
+    }
+    return u.toString();
+  } catch {
+    return new URL(canonicalUrl, Astro.site).toString();
+  }
+})();
+
+// ── JSON-LD ─────────────────────────────────────────────────────────
+// dateModified fallback：沒有更新日期時，退回 pubDate，
+// 讓 Google & AI 引擎至少能讀到一個有效的修改時間戳。
+const effectiveModified = updatedDate || pubDate;
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'WebSite',
+      '@id': `${Astro.site}#website`,
+      url: Astro.site?.toString(),
+      name: siteName,
+      inLanguage: 'zh-TW',
+      potentialAction: {
+        '@type': 'SearchAction',
+        target: {
+          '@type': 'EntryPoint',
+          urlTemplate: `${Astro.site}search?q={search_term_string}`,
+        },
+        'query-input': 'required name=search_term_string',
+      },
+    },
+    {
+      '@type': 'Person',
+      '@id': `${Astro.site}#author`,
+      name: authorName,
+      url: Astro.site?.toString(),
+    },
+    ...(ogType === 'article' && pubDate
+      ? [
+          {
+            '@type': 'BlogPosting',
+            '@id': `${resolvedCanonical}#article`,
+            headline: title,
+            description,
+            url: resolvedCanonical,
+            // ✅ 時間欄位：統一使用 ISO 8601，機器可解析
+            datePublished: pubDate,
+            dateModified: effectiveModified,
+            // ✅ keywords：用於 Entity Linking，以逗號分隔字串
+            ...(tags.length > 0 && { keywords: tags.join(', ') }),
+            image: {
+              '@type': 'ImageObject',
+              url: ogImageUrl,
+              width: 1200,
+              height: 630,
+            },
+            author: { '@id': `${Astro.site}#author` },
+            publisher: { '@id': `${Astro.site}#website` },
+            isPartOf: { '@id': `${Astro.site}#website` },
+            inLanguage: 'zh-TW',
+          },
+        ]
+      : []),
+  ],
+};
+---
+
+<!-- Primary Meta -->
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={resolvedCanonical} />
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+
+<!-- Open Graph -->
+<meta property="og:type" content={ogType} />
+<meta property="og:url" content={resolvedCanonical} />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:image" content={ogImageUrl} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:site_name" content={siteName} />
+<meta property="og:locale" content="zh_TW" />
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={ogImageUrl} />
+
+<!-- Article timestamps -->
+{pubDate && <meta property="article:published_time" content={pubDate} />}
+{effectiveModified && <meta property="article:modified_time" content={effectiveModified} />}
+{tags.map((tag) => <meta property="article:tag" content={tag} />)}
+
+<!-- JSON-LD -->
+<script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />

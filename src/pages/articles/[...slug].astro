@@ -1,0 +1,153 @@
+---
+// src/pages/articles/[...slug].astro
+import { getCollection, type CollectionEntry } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+// 1. 靜態路徑生成（SSG）
+export const prerender = true;
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts', ({ data }) => {
+    // 過濾草稿：生產環境排除 draft: true
+    return import.meta.env.PROD ? !data.draft : true;
+  });
+
+  return posts.map((post) => ({
+    params: { slug: post.slug },
+    props: { post },
+  }));
+}
+
+// 2. 型別定義
+type Props = { post: CollectionEntry<'posts'> };
+const { post } = Astro.props;
+const { data, slug } = post;
+
+// 3. 渲染 Markdown/MDX 內容
+const { Content, remarkPluginFrontmatter } = await post.render();
+
+// 4. 計算預估閱讀時間（從 remark-reading-time plugin 取得，或自行計算）
+const readingTime: string = remarkPluginFrontmatter?.readingTime ?? '5 分鐘';
+
+// 5. 建立規範 URL 與 OG Image 絕對路徑
+const canonicalUrl = new URL(`/articles/${slug}`, Astro.site).href;
+const ogImageSrc = data.image?.src ?? '/og-default.png';
+
+// 6. 格式化日期
+const formatDate = (d: Date) =>
+  d.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' });
+---
+
+<!--
+  BaseLayout 負責 <html>/<body>/header/footer 骨架。
+  SEO 組件則放在 BaseLayout 的 <head> slot 中，
+  透過 ogType="article" 觸發 JSON-LD BlogPosting schema。
+-->
+<BaseLayout
+  title={`${data.title} · 你的部落格`}
+  description={data.description}
+  ogType="article"
+  pubDate={data.pubDate}
+  updatedDate={data.updatedDate}
+  canonicalUrl={canonicalUrl}
+  ogImage={ogImageSrc}
+  tags={data.tags}
+>
+  <div class="mx-auto max-w-2xl px-4 py-16">
+
+    <!-- Article Header -->
+    <header class="mb-10">
+      <!-- Breadcrumb（對 GEO 友善的麵包屑） -->
+      <nav aria-label="麵包屑" class="mb-6">
+        <ol class="flex items-center gap-2 text-xs text-zinc-400">
+          <li><a href="/" class="hover:text-zinc-700 transition-colors">首頁</a></li>
+          <li aria-hidden="true">/</li>
+          <li><a href="/articles" class="hover:text-zinc-700 transition-colors">文章</a></li>
+          <li aria-hidden="true">/</li>
+          <li class="text-zinc-500" aria-current="page">{data.title}</li>
+        </ol>
+      </nav>
+
+      <!-- Tags -->
+      {data.tags.length > 0 && (
+        <ul class="mb-4 flex flex-wrap gap-2" aria-label="文章標籤">
+          {data.tags.map((tag) => (
+            <li>
+              <a
+                href={`/tags/${tag}`}
+                class="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-200 transition-colors"
+              >
+                #{tag}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h1 class="text-3xl font-bold leading-tight tracking-tight text-zinc-900 sm:text-4xl">
+        {data.title}
+      </h1>
+      <p class="mt-3 text-base leading-relaxed text-zinc-500">{data.description}</p>
+
+      <!-- Meta row -->
+      <div class="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-400">
+        <time datetime={data.pubDate.toISOString()}>
+          發佈於 {formatDate(data.pubDate)}
+        </time>
+        {data.updatedDate && (
+          <>
+            <span aria-hidden="true">·</span>
+            <time datetime={data.updatedDate.toISOString()}>
+              更新於 {formatDate(data.updatedDate)}
+            </time>
+          </>
+        )}
+        <span aria-hidden="true">·</span>
+        <span>{readingTime} 閱讀</span>
+      </div>
+
+      <!-- Cover image -->
+      {data.image && (
+        <figure class="mt-8 overflow-hidden rounded-xl">
+          <img
+            src={data.image.src}
+            alt={data.image.alt}
+            width="800"
+            height="450"
+            class="w-full object-cover"
+            loading="eager"
+            decoding="async"
+          />
+          {data.image.caption && (
+            <figcaption class="mt-2 text-center text-xs text-zinc-400">
+              {data.image.caption}
+            </figcaption>
+          )}
+        </figure>
+      )}
+    </header>
+
+    <!-- Article Body：prose 類由 @tailwindcss/typography 提供 -->
+    <article
+      class="prose prose-zinc prose-sm sm:prose-base max-w-none
+             prose-headings:font-semibold prose-headings:tracking-tight
+             prose-a:text-zinc-900 prose-a:underline-offset-4
+             prose-code:rounded prose-code:bg-zinc-100 prose-code:px-1 prose-code:py-0.5
+             prose-pre:bg-zinc-950 prose-pre:text-zinc-100"
+      aria-label="文章內容"
+    >
+      <Content />
+    </article>
+
+    <!-- Footer nav -->
+    <footer class="mt-16 border-t border-zinc-100 pt-8">
+      <a
+        href="/articles"
+        class="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+      >
+        ← 回到文章列表
+      </a>
+    </footer>
+
+  </div>
+</BaseLayout>

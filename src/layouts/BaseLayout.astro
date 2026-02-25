@@ -1,0 +1,74 @@
+---
+import "../styles/global.css";
+import SEO from "../components/SEO.astro";
+
+export interface Props {
+  title: string;
+  description: string;
+  ogType?: "website" | "article";
+  pubDate?: Date;
+  updatedDate?: Date;
+  canonicalUrl?: string;
+  ogImage?: string;
+  tags?: string[];
+}
+
+const {
+  title,
+  description,
+  ogType = "website",
+  pubDate,
+  updatedDate,
+  canonicalUrl,
+  ogImage,
+  tags = [],
+} = Astro.props;
+
+const fontsUrl =
+  "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&family=Inter:wght@400;500;600&display=swap";
+---
+
+<!doctype html>
+<html lang="zh-TW" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href={fontsUrl} rel="stylesheet" />
+    <link rel="alternate" type="application/rss+xml" title="你的部落格 RSS" href="/rss.xml" />
+    <SEO
+      title={title}
+      description={description}
+      ogType={ogType}
+      pubDate={pubDate?.toISOString()}
+      updatedDate={updatedDate?.toISOString()}
+      canonicalUrl={canonicalUrl}
+      ogImage={ogImage}
+      tags={tags}
+    />
+  </head>
+  <body class="bg-white text-zinc-800 antialiased">
+    <header class="sticky top-0 z-50 border-b border-zinc-100 bg-white/80 backdrop-blur-sm">
+      <div class="mx-auto flex max-w-2xl items-center justify-between px-6 py-4">
+        <a href="/" class="text-sm font-semibold tracking-tight text-zinc-900 transition-colors hover:text-zinc-600">
+          你的部落格
+        </a>
+        <nav aria-label="主導覽">
+          <ul class="flex gap-6 text-sm text-zinc-500">
+            <li><a href="/articles" class="transition-colors hover:text-zinc-900">文章</a></li>
+            <li><a href="/about" class="transition-colors hover:text-zinc-900">關於</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main-content" tabindex="-1">
+      <slot />
+    </main>
+
+    <footer class="mt-24 border-t border-zinc-100 py-10 text-center text-xs text-zinc-400">
+      <p>&copy; {new Date().getFullYear()} 你的名字 · 保留所有權利</p>
+    </footer>
+  </body>
+</html>
